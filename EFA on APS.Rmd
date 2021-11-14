@@ -1,0 +1,188 @@
+
+Assignment 4 – Data Processing and Descriptive Analysis – 10 points
+
+ 
+
+In order to prepare for the exploratory factor analysis (EFA), you need to prepare and answer the following questions:
+
+ 
+
+1. Who are the participants participated in the survey?
+2. Provide the demographic profiles of the participants.
+3. Is there any missing data in the dataset? If yes, which type of missing data is there? Is there a need to compute the missing data?
+3. Drop all of the missing data.
+4. Define the type of data you have in the dataset and how do you consider the normality of the type of your data for EFA model? Please use this article as your point of reference: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3886444/
+5. How do detect outliers? Report on the outliers and methods to deal outliers.
+6. Provide the descriptive analysis (Mean, SD, Skewness, and Kurtosis) for the selected variables for EFA models.
+7. Provide analysis to identify potential differences of employees’ satisfactions between subordinate and managers.
+8. Use different graphs and charts to support your descriptive analysis.
+ 
+
+Note that there is another paper to explain the process of EFA modelling:https://support.sas.com/resources/papers/proceedings12/331-2012.pdf
+
+ 
+
+```{r Import dataset}
+aps <- read.csv("C:/Users/aran_/Desktop/2017-aps-employee-census-5-point-dataset.csv", stringsAsFactors = TRUE, na.strings = " ")
+head(aps)
+dim(aps)
+```
+
+```{r NA Values}
+sum(is.na(aps))
+levels(aps$q1)
+levels(aps$q26a)
+summary(aps)
+```
+
+
+
+```{r Assigning ordinal values to numerical factor}
+library(dplyr)
+
+# Age level ordered
+aps$q2. <- factor(aps$q2., levels = c('Under 40 years', '40 to 54 years', "55 years or older"), ordered = TRUE)
+
+levels(aps$q2.)
+
+# Classification level ordered
+aps$q7. <- factor(aps$q7., levels = c("Trainee/Graduate/APS", "EL", "SES"), ordered = TRUE)
+
+levels(aps$q7.)
+
+# Question 41 ordered
+ord_freq <- aps %>% select(c('q41a', 'q41b', 'q41c', 'q41d','q41e', 'q41f', 'q41g'))
+
+freqLevel <- c('Always', 'Often','Sometimes','Rarely','Never')
+
+factfunc <- function(aps, freqLevel){
+  factor(aps, 
+     levels=freqLevel, 
+     ordered = TRUE)
+  fct_unify(aps, 
+          levels=freqLevel) 
+}
+
+
+
+freqLevel <- factfunc(ord_freq, freqLevel) %>% as.data.frame()
+str(freqLevel)
+
+# General Health Ordered 
+aps$q43 <- factor(aps$q43, levels = c("Poor", "Fair", "Good", "Very Good", "Excellent"), ordered = TRUE)
+
+
+
+
+
+
+# Five years time Question 58
+
+```
+
+```{r}
+library(naniar)
+gg_miss_var(aps, show_pct = TRUE)
+gg_miss_upset(aps, nsets = 50)
+dim(aps)
+
+dim(aps[rowSums(is.na(aps)) > 250, ])
+
+y <- as.data.frame(rowSums(is.na(aps)))
+View(y)
+t <- as.data.frame(colSums(is.na(aps)))
+View(t)
+
+rowSums(is.na(aps)) 
+rownames(rank(t))
+```
+
+Dropped variables with more than 80% missing values
+
+```{r Column wise deletion} 
+miss <- c()
+for(i in 1:ncol(aps)) {
+  if(length(which(is.na(aps[,i]))) > 0.8*nrow(aps)) miss <- append(miss,i) 
+}
+data2 <- aps[,-miss]
+dim(data2)
+
+gg_miss_var(data2, show_pct = TRUE)
+
+```
+
+
+```{r Row wise deletion}
+
+miss2 <- c()
+for(i in 1:nrow(data2)) {
+  if(length(which(is.na(data2[i,]))) > 0.8*ncol(data2)) miss2 <- append(miss2,i) 
+}
+data <- data2[-miss2,]
+dim(data)
+# gg_miss_upset(data, nsets = 50)
+# gg_miss_var(data, show_pct = TRUE)
+```
+
+```{r function to replace old with new}
+replace_imputed <- function(original, imputed){
+
+  namestoChange <- colnames(original)[colnames(imputed) %in% colnames(original)]
+
+  for(i in 1:length(namestoChange)){
+    original[namestoChange[i]] <- imputed[namestoChange[i]]
+  }
+  return(original)
+
+}
+```
+
+
+Ranked ordinal data - according to likert scale - ranked from one to five
+```{r}
+library(dplyr)
+
+# Subsetted data = 1 - 5 : Strongly disagree to strongly disagree
+one_to_five <- data %>% select(c("q26a" ,  "q26b"  , "q26c" ,  "q26d" ,  "q26e" ,  "q26f" ,  "q26g" ,"q26h"   ,"q26i"   ,"q27a"  , "q27b"  , "q27c",   "q27d"  , "q27e",   "q27f" ,  "q28a"  , "q28b"  , "q28c" ,"q28d"  , "q28e"   ,"q28f",   "q28g",   "q28h",   "q28i" ,  "q28j" ,  "q28k" ,  "q28l"  , "q28m",   "q28n", "q28o"  , "q30a"  , "q30b",   "q30c",   "q30d"  , "q30e"  , "q30f",   "q30g",   "q30h" ,  "q30i" ,  "q30j" ,"q30k"  , "q30l",  "q32a",   "q32b",   "q32c" ,  "q32d",   "q32e" ,"q32f" ,  "q32g"  , "q32h" ,  "q32i" ,  "q32j" ,  "q32k" ,  "q32l" ,  "q32m" ,  "q32n"  , "q32o"  , "q32p", "q35a" ,  "q35b" ,  "q35c",   "q35d", "q62", "q64", "q65", "q81a" ,  "q81b" ,  "q81c",   "q81d", "q81e", "q76a" ,  "q76b",   "q76c", "q76d", "q70a",   "q70b" ,  "q70c", "q67a"  , "q67b",   "q67c",   "q67d",   "q67e" ,  "q67f",   "q67g" ,  "q67h", "q65" , "q64", "q62", "q51a","q51b","q51c", "q50a"  , "q50b" ,  "q50c" ,  "q50d"  , "q50e", "q42a",   "q42b" ,  "q42c" ,  "q42d"  , "q42e" ,  "q42f" ,  "q42g","q42h" ,  "q42i" )) 
+
+# Agree Level Ordered
+agreeLevel <- c('Strongly agree', 'Agree', 'Neither agree nor disagree', 'Disagree', 'Strongly disagree')
+
+
+for (i in 1:ncol(one_to_five)) {
+  one_to_five[,i] <- factor(one_to_five[,i],  levels = agreeLevel, ordered=TRUE)
+}
+
+data[names(one_to_five)] <- one_to_five
+
+str(data)
+```
+
+Ranking Likert questions from one - six ordinal data
+```{r}
+one_to_six <- data %>% select(c("q94a", "q94b",   "q94c",   "q94d",   "q94e" ,  "q94f", "q31a" ,  "q31b"  , "q31c" ,  "q31d")) 
+
+# Agree Level Ordered
+agreeLevel_six <- c('Strongly agree', 'Agree', 'Neither agree nor disagree', 'Disagree', 'Strongly disagree', 'Do not know')
+
+# Ordering the data
+for (i in 1:ncol(one_to_six)) {
+  one_to_six[,i] <- factor(one_to_six[,i],  levels = agreeLevel_six, ordered=TRUE)
+}
+
+# replacing the old values with ordered ones 
+data[names(one_to_six)] <- one_to_six
+
+```
+
+```{r Final structure after ranking}
+summary(data)
+```
+
+Running missForest for remaining missing values 
+```{r}
+library(naniar)
+
+data_mf <- missForest::missForest(data)
+```
+
